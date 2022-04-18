@@ -1,14 +1,17 @@
 use legion::world::ComponentError;
+use legion::world::EntityAccessError;
 use legion::{Entity, World};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use thiserror::Error;
 
+pub mod systems;
+
 #[derive(Serialize, Deserialize)]
 pub struct Player;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AtRoom {
     pub room: Entity,
 }
@@ -18,7 +21,7 @@ pub struct Exit {
     pub name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Exits {
     pub exits: HashMap<Exit, Entity>,
 }
@@ -42,12 +45,23 @@ pub struct Description {
     pub long: String,
 }
 
+#[derive(Debug)]
+pub struct WantsToMove {
+    pub to: Exit,
+}
+
+pub enum Message {
+    Movement { who: Entity, to: Exit },
+}
+
 #[derive(Error, Debug)]
 pub enum MasmorraError {
     #[error("component {0} is not available")]
     Component(#[from] ComponentError),
     #[error("Entity {0} not found")]
     EntityErr(String),
+    #[error("Entity access error: {0}")]
+    EntityAccessErr(#[from] EntityAccessError),
 }
 
 pub fn link(

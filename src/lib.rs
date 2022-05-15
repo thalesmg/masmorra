@@ -55,8 +55,10 @@ pub struct WantsToLook {
     pub who: Entity,
 }
 
+#[derive(Debug)]
 pub enum Message {
-    Movement { who: Entity, to: Exit },
+    Move { who: Entity, to: Exit },
+    Look { who: Entity },
 }
 
 #[derive(Error, Debug)]

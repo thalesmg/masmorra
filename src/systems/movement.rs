@@ -1,4 +1,5 @@
-use crate::{AtRoom, Exits, MasmorraError, WantsToMove};
+use crate::{AtRoom, Exits, MasmorraError, WantsToLook, WantsToMove};
+use crossbeam_channel::Sender;
 use legion::world::SubWorld;
 use legion::{system, systems::CommandBuffer, Entity, EntityStore};
 
@@ -11,10 +12,19 @@ pub fn movement(
     world: &mut SubWorld,
     ent: &Entity,
     wanna_move: &WantsToMove,
+    ret: Option<&Sender<String>>,
 ) {
     match find_destination(world, wanna_move) {
         Ok(to) => {
-            let _ = try_move(world, wanna_move, to);
+            let res = try_move(world, wanna_move, to);
+            if let (Ok(()), Some(ret)) = (res, ret) {
+                cmd.push((
+                    WantsToLook {
+                        who: wanna_move.who,
+                    },
+                    ret.clone(),
+                ));
+            }
         }
         Err(err) => {
             dbg!(err);

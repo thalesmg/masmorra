@@ -1,51 +1,39 @@
-use legion::{systems::CommandBuffer, *};
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use legion::*;
+use masmorra::systems::io::look_system;
 use masmorra::systems::movement::movement_system;
-use masmorra::{make_simple_zone, AtRoom, Description, Exit, Exits, Player, WantsToMove};
+use masmorra::{make_simple_zone, AtRoom, Exit, Message, Player, WantsToLook, WantsToMove};
+use std::thread;
 
-fn stub_loop(mut world: World, mut resources: Resources, mut schedule: Schedule) {
+fn world_loop(rx: Receiver<(Sender<String>, Message)>, mut world: World) {
+    use Message::*;
+    let mut resources = Resources::default();
+    let mut schedule = Schedule::builder()
+        .add_system(movement_system())
+        .flush()
+        .add_system(look_system())
+        .build();
     loop {
-        let mut cmd = CommandBuffer::new(&world);
-        let mut query = <(Entity, &Player, &mut AtRoom)>::query();
-        let (mut qworld, mut sub_world) = world.split_for_query(&query);
-
-        query.for_each_mut(
-            &mut qworld,
-            |(player_ent, _player, AtRoom { room: at_room })| {
-                let room = sub_world.entry_mut(*at_room).expect("no such room!");
-                let desc = room
-                    .get_component::<Description>()
-                    .expect("room without description!");
-                let exits = room.get_component::<Exits>().expect("room without exits!");
-                let exit_names = exits
-                    .exits
-                    .keys()
-                    .map(|Exit { name }| name.clone())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                println!("{}\n\n{}\n", desc.short, desc.long);
-                println!("Exits: {}\n", exit_names);
-                use std::io;
-                use std::io::prelude::*;
-                print!("> ");
-                io::stdout().flush().expect("couldn't flush stdout");
-                let mut response = String::new();
-                io::stdin()
-                    .read_line(&mut response)
-                    .expect("couldn't read from stdin!");
-                println!();
-
-                response = response.trim().to_string();
-                if !response.is_empty() {
-                    cmd.push((WantsToMove {
-                        who: *player_ent,
-                        to: Exit { name: response },
-                    },));
-                }
-            },
-        );
-
-        cmd.flush(&mut world, &mut resources);
+        match rx.recv().unwrap() {
+            (ret, Look { who }) => {
+                world.push((WantsToLook { who }, ret));
+            }
+            (ret, Move { who, to }) => {
+                world.push((WantsToMove { who, to }, ret));
+            }
+        }
         schedule.execute(&mut world, &mut resources);
+    }
+}
+
+fn print_loop(io_rx: Receiver<String>) {
+    use std::io;
+    use std::io::prelude::*;
+    loop {
+        let msg = io_rx.recv().unwrap();
+        println!("\n{}", msg);
+        print!("> ");
+        io::stdout().flush().expect("couldn't flush stdout");
     }
 }
 
@@ -56,10 +44,48 @@ fn main() {
 
     let initial_room = make_simple_zone(&mut world);
 
-    world.push((Player, AtRoom { room: initial_room }));
+    let player_ent = world.push((Player, AtRoom { room: initial_room }));
 
-    let resources = Resources::default();
-    let schedule = Schedule::builder().add_system(movement_system()).build();
+    let (world_tx, world_rx) = unbounded();
 
-    stub_loop(world, resources, schedule);
+    thread::spawn(move || {
+        world_loop(world_rx, world);
+    });
+
+    let (io_tx, io_rx) = unbounded();
+    thread::spawn(move || {
+        print_loop(io_rx);
+    });
+    // initial look
+    world_tx
+        .send((io_tx.clone(), Message::Look { who: player_ent }))
+        .unwrap();
+
+    use std::io;
+    let mut response = String::new();
+    loop {
+        io::stdin()
+            .read_line(&mut response)
+            .expect("couldn't read from stdin!");
+        response = response.trim().to_string();
+        match response.as_str() {
+            "" => continue,
+            "quit" => break,
+            "look" => world_tx
+                .send((io_tx.clone(), Message::Look { who: player_ent }))
+                .unwrap(),
+            exit => world_tx
+                .send((
+                    io_tx.clone(),
+                    Message::Move {
+                        who: player_ent,
+                        to: Exit {
+                            name: exit.to_string(),
+                        },
+                    },
+                ))
+                .unwrap(),
+        };
+        response.clear();
+    }
 }

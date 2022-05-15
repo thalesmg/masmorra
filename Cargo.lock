@@ -212,6 +212,7 @@ dependencies = [
 name = "masmorra"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "legion",
  "serde",
  "serde_json",

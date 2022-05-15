@@ -47,7 +47,12 @@ pub struct Description {
 
 #[derive(Debug)]
 pub struct WantsToMove {
+    pub who: Entity,
     pub to: Exit,
+}
+
+pub struct WantsToLook {
+    pub who: Entity,
 }
 
 pub enum Message {

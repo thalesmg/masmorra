@@ -36,12 +36,10 @@ fn stub_loop(mut world: World, mut resources: Resources, mut schedule: Schedule)
 
                 response = response.trim().to_string();
                 if !response.is_empty() {
-                    cmd.add_component(
-                        *player_ent,
-                        WantsToMove {
-                            to: Exit { name: response },
-                        },
-                    );
+                    cmd.push((WantsToMove {
+                        who: *player_ent,
+                        to: Exit { name: response },
+                    },));
                 }
             },
         );

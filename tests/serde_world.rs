@@ -31,6 +31,10 @@ fn serialize_simple_zone() {
     assert!(val.is_object());
 
     let map = val.as_object().unwrap();
+    // single key "entities"
+    assert!(map.contains_key("entities"));
+    assert_eq!(map.len(), 1);
+    let map = map.get("entities").unwrap().as_object().unwrap();
     // 3 rooms + 1 player
     assert_eq!(map.len(), 4);
 }

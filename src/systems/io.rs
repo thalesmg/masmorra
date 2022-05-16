@@ -19,7 +19,6 @@ pub fn look(
         Ok(()) => (),
         Err(err) => {
             dbg!(err);
-            ()
         }
     }
     cmd.remove(*ent);

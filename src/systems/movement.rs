@@ -45,8 +45,8 @@ fn find_destination(
     exits
         .exits
         .get(&wanna_move.to)
-        .ok_or(MasmorraError::EntityErr("exit not found".to_string()))
-        .and_then(|r| Ok(*r))
+        .ok_or_else(|| MasmorraError::EntityErr("exit not found".to_string()))
+        .map(|r| *r)
 }
 
 fn try_move(
